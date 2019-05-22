@@ -95,8 +95,8 @@ void setup() {
   adc.setStartPin(PA3);
   adc.begin(chip_select); // setup with chip select pin
   adc.setGain(ADS126X_GAIN_32);
-  adc.setRate(ADS126X_RATE_38400);
-  adc.setFilter(ADS126X_SINC1);
+  adc.setRate(ADS126X_RATE_7200);
+  adc.setFilter(ADS126X_SINC4);
   adc.enableInternalReference();
   adc.startADC1(); // start conversion on ADC1
   
