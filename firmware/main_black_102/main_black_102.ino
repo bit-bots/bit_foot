@@ -5,7 +5,7 @@
 #include <libmaple/usart.h>
 #include <libmaple/gpio.h>
 #include <wirish.h>
-
+#include "malloc.h"
 #include "dxl.h"
 
 #include "ADS126X.h"
@@ -28,10 +28,10 @@ int32_t force[4];
 int direction_pin = PB1;
 
 // ID of this board 
-ui8 DXL_ID = 102;
+ui8 DXL_ID = 101;
 
 // buffer for dynamxiel bus
-const int BUFFER_SIZE = 128;
+const int BUFFER_SIZE = 64;
 ui8 write_buffer[BUFFER_SIZE];
 
 
@@ -58,7 +58,7 @@ void setup() {
   pinMode(PA3, OUTPUT);
   digitalWrite(PA3, HIGH); 
   
-  Serial.begin(2000000);
+  //Serial.begin(2000000);
   Serial1.begin(2000000);  
 
   pinMode(direction_pin, OUTPUT);
@@ -130,7 +130,6 @@ void bus_tick(){
 
 
 void response_to_ping(){
-  Serial.print("b");
   digitalWrite(direction_pin, HIGH);
   int len = dxl_write_packet(&ping_resp, write_buffer);
   Serial1.write(write_buffer, len);
@@ -142,7 +141,6 @@ void response_to_ping(){
 }
 
 void response_to_read(){
-  Serial.print("a");
   digitalWrite(direction_pin, HIGH);
   //make package with current bytes from the sensors
   for(int i = 0; i < 4; i++){
@@ -167,14 +165,13 @@ void loop(){
   // https://github.com/Molorius/ADS126X/issues/5
   adc.readADC1(pos_pin[current_sensor], neg_pin[current_sensor]);
   unsigned long current_time = micros();
-  while(micros() - current_time < 1000)
+  while(micros() - 1000 < current_time)
   {
-    bus_tick();
+      bus_tick();
   }
   // actual read
   force[current_sensor] = adc.readADC1(pos_pin[current_sensor], neg_pin[current_sensor]);
   current_sensor = (current_sensor + 1) % 4;
-  
 }
 
 
