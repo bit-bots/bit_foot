@@ -28,7 +28,7 @@ int32_t force[4];
 int direction_pin = PB1;
 
 // ID of this board 
-ui8 DXL_ID = 101;
+ui8 DXL_ID = 102;
 
 // buffer for dynamxiel bus
 const int BUFFER_SIZE = 64;

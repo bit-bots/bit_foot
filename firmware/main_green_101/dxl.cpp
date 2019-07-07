@@ -195,7 +195,7 @@ void dxl_packet_push_byte(volatile struct dxl_packet *packet, ui8 b)
                 goto pc_error;
             }
             packet->id = b;
-            if(b !=102)
+            if(b !=101)
               goto pc_error;
             
             break;
