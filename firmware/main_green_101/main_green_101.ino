@@ -7,7 +7,7 @@
 #include <libmaple/gpio.h>
 #include <wirish.h>
 #include "malloc.h"
-#include "dxl.h"
+#include "dxl.hpp"
 
 #include "ADS126X.h"
 

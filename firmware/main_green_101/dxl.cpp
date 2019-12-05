@@ -7,8 +7,8 @@
 #include <string.h>
 #include <libmaple/gpio.h>
 #include <wirish.h>
-#include "dxl.h"
-#include "dxl_protocol.h"
+#include "dxl.hpp"
+#include "dxl_protocol.hpp"
 
 
 volatile int dxl_debug = 0;

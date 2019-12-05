@@ -2,7 +2,7 @@
  * This code is originally based on the work of Team Rhoban available at https://github.com/Rhoban/DXLBoard
  */
 #include <wirish.h>
-#include "dxl_protocol.h"
+#include "dxl_protocol.hpp"
 
 void dxl_process(
         volatile struct dxl_device *device,

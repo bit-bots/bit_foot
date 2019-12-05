@@ -1,10 +1,10 @@
 /*
  * This code is originally based on the work of Team Rhoban available at https://github.com/Rhoban/DXLBoard
  */
-#ifndef DXL_PROTOCOL_H
-#define DXL_PROTOCOL_H
+#ifndef DXL_PROTOCOL_HPP
+#define DXL_PROTOCOL_HPP
 
-#include "dxl.h"
+#include "dxl.hpp"
 
 #define DXL_PING        0x01
 #define DXL_READ_DATA   0x02
@@ -78,4 +78,4 @@ struct dxl_registers
     volatile char eeprom_dirty;
 } __attribute__((packed));
 
-#endif // DXL_PROTOCOL_H
+#endif // DXL_PROTOCOL_HPP

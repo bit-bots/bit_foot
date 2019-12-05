@@ -1,8 +1,8 @@
 /*
  * This code is originally based on the work of Team Rhoban available at https://github.com/Rhoban/DXLBoard
  */
-#ifndef DXL_H
-#define DXL_H
+#ifndef DXL_HPP
+#define DXL_HPP
 
 // Protocol definition
 #define DXL_BROADCAST   0xFE
@@ -71,4 +71,4 @@ void dxl_bus_tick(struct dxl_bus *bus);
 void dxl_set_master(struct dxl_bus *bus, volatile struct dxl_device *master);
 void dxl_add_slave(struct dxl_bus *bus, volatile struct dxl_device *slave);
 
-#endif // DXL_H
+#endif // DXL_HPP

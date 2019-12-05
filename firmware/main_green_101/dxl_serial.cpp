@@ -8,8 +8,8 @@
 #include <libmaple/dma.h>
 #include <libmaple/usart.h>
 #include <libmaple/usb_cdcacm.h>
-#include "dxl_protocol.h"
-#include "dxl_serial.h"
+#include "dxl_protocol.hpp"
+#include "dxl_serial.hpp"
 
 // Serial com
 #define DIRECTION1      29
