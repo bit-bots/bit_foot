@@ -1,24 +1,32 @@
 /*
  * This code is originally based on the work of Team Rhoban available at https://github.com/Rhoban/DXLBoard
  */
-#include <stdlib.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <wirish.h>
+#include <array>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
 #include <libmaple/dma.h>
 #include <libmaple/usart.h>
 #include <libmaple/usb_cdcacm.h>
+#include <memory>
+#include <wirish.h>
+
 #include "dxl_protocol.hpp"
 #include "dxl_serial.hpp"
 
 // Serial com
-#define DIRECTION1      29
-#define DIRECTION2      30
-#define DIRECTION3      31
+constexpr unsigned int DIRECTION1  = 29;
+constexpr unsigned int DIRECTION2  = 30;
+constexpr unsigned int DIRECTION3  = 31;
+
+constexpr unsigned int MAGIC_NUM_1 = 254;
+constexpr unsigned int MAGIC_NUM_2 = 8;
+constexpr unsigned int MAGIC_NUM_3 = 200;
+
 
 // Devices allocation
 static bool serialInitialized = false;
-static uint8_t devicePorts[254];
+static std::array< uint8_t, MAGIC_NUM_1> devicePorts;
 
 // Device data
 struct serial
@@ -52,11 +60,11 @@ void usart_tcie(usart_reg_map *regs, int en) {
 }
 
 // Ports that are online
-struct serial *serials[8] = {0};
+std::array<struct serial*, MAGIC_NUM_2> serials = {nullptr};
 
 static void receiveMode(struct serial *serial);
 
-ui8 status_send_buffer[DXL_BUFFER_SIZE];
+std::array<ui8, DXL_BUFFER_SIZE> status_send_buffer;
 
 static void serial_received(struct serial *serial)
 {
@@ -163,14 +171,14 @@ void transmitMode(struct serial *serial)
     asm volatile("nop");
 }
 
-void initSerial(struct serial *serial, int baudrate = DXL_DEFAULT_BAUDRATE)
+void initSerial(struct serial *serial, unsigned int baudrate)
 {
     pinMode(serial->direction, OUTPUT);
 
     // Enabling serial port in receive mode
     serial->port->begin(baudrate);
     serial->port->c_dev()->regs->CR3 = USART_CR3_DMAT;
-    
+
     // Entering receive mode
     receiveMode(serial);
 
@@ -185,7 +193,7 @@ void sendSerialPacket(struct serial *serial, volatile struct dxl_packet *packet)
     serial->port->flush();
 
     // Writing the packet in the buffer
-    int n = dxl_write_packet(packet, (ui8 *)serial->outputBuffer);
+    auto n = dxl_write_packet(packet, reinterpret_cast<ui8 *>(serial->outputBuffer));
 
     // Go in transmit mode
     transmitMode(serial);
@@ -219,15 +227,15 @@ void sendSerialPacket(struct serial *serial, volatile struct dxl_packet *packet)
 /**
  * Ticking
  */
-static void dxl_serial_tick(volatile struct dxl_device *self) 
+static void dxl_serial_tick(volatile struct dxl_device *self)
 {
-    struct serial *serial = (struct serial*)self->data;
+    auto *serial = (struct serial*)self->data;
 
     // Timeout on sending packet, this should never happen
     if (!serial->txComplete && ((millis() - serial->packetSent) > 3)) {
         serial_received(serial);
     }
- 
+
     if (serial->txComplete) {
         // send buffered master package
         if(serial->buffed_master_package){
@@ -250,11 +258,11 @@ static void dxl_serial_tick(volatile struct dxl_device *self)
  */
 static void process(volatile struct dxl_device *self, volatile struct dxl_packet *packet)
 {
-    struct serial *serial = (struct serial*)self->data;
+    auto *serial = (struct serial*)self->data;
     dxl_serial_tick(self);
 
     // first check if this package is for the servos
-    if(packet->id == DXL_BROADCAST || packet->id < 200){
+    if(packet->id == DXL_BROADCAST || packet->id < MAGIC_NUM_3){
         // write it if possible
         if (serial->txComplete) {
             self->packet.dxl_state = 0;
@@ -274,9 +282,9 @@ void dxl_serial_init(volatile struct dxl_device *device, int index)
     ASSERT(index >= 1 && index <= 3);
 
     // Initializing device
-    struct serial *serial = (struct serial*)malloc(sizeof(struct serial));
+    auto *serial = static_cast<struct serial*>(malloc(sizeof(struct serial)));
     dxl_device_init(device);
-    device->data = (void *)serial;
+    device->data = static_cast<void *>(serial);
     device->tick = dxl_serial_tick;
     device->process = process;
 
@@ -298,11 +306,11 @@ void dxl_serial_init(volatile struct dxl_device *device, int index)
         serial->channel = DMA_CH2;
     }
 
-    initSerial(serial);
+    initSerial(serial,DXL_DEFAULT_BAUDRATE);
 
     if (!serialInitialized) {
         serialInitialized = true;
-    
+
         // Initializing DMA
         dma_init(DMA1);
 
@@ -311,8 +319,8 @@ void dxl_serial_init(volatile struct dxl_device *device, int index)
         usart3_tc_handler = usart3_tc;*/
 
         // Reset allocation
-        for (unsigned int k=0; k<sizeof(devicePorts); k++) {
-            devicePorts[k] = 0;
+        for (unsigned char & devicePort : devicePorts) {
+            devicePort = 0;
         }
     }
     serial->buffed_master_package = false;
