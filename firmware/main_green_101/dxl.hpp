@@ -4,17 +4,19 @@
 #ifndef DXL_HPP
 #define DXL_HPP
 
+#include <cstdint>
+
 // Protocol definition
-#define DXL_BROADCAST   0xFE
+constexpr unsigned int DXL_BROADCAST = 0xfe;
 
 // Size limit for a buffer containing a dynamixel packet
-#define DXL_BUFFER_SIZE 330
+constexpr unsigned int DXL_BUFFER_SIZE = 330;
 
 // Maximum parameters in a packet
-#define DXL_MAX_PARAMS  240
+constexpr unsigned  int DXL_MAX_PARAMS = 240;
 
 
-typedef unsigned char ui8;
+using ui8 = unsigned char;
 
 /**
  * A dynamixel packet
@@ -34,7 +36,7 @@ void dxl_packet_init(volatile struct dxl_packet *packet);
 void dxl_packet_push_byte(volatile struct dxl_packet *packet, ui8 b);
 int dxl_write_packet(volatile struct dxl_packet *packet, ui8 *buffer);
 void dxl_copy_packet(volatile struct dxl_packet *from, volatile struct dxl_packet *to);
-unsigned short update_crc(unsigned short crc_accum, unsigned char *data_blk_ptr, unsigned short data_blk_size);
+uint16_t update_crc(uint16_t crc_accum, unsigned char *data_blk_ptr, uint16_t data_blk_size);
 
 /**
  * A Dynamixel Device which is on the bus
