@@ -1,8 +1,10 @@
 /*
  * This code is originally based on the work of Team Rhoban available at https://github.com/Rhoban/DXLBoard
  */
-#include <wirish.h>
 #include "dxl_protocol.hpp"
+#include <wirish.h>
+
+constexpr unsigned int MAGIC_NUM_0 = 8;
 
 void dxl_process(
         volatile struct dxl_device *device,
@@ -16,7 +18,7 @@ void dxl_process(
         device->packet.id = packet->id;
 
         switch (packet->instruction) {
-            case DXL_PING: 
+            case DXL_PING:
                 // Answers the ping
                 if (packet->id != DXL_BROADCAST) {
                     device->packet.error = DXL_NO_ERROR;
@@ -30,7 +32,7 @@ void dxl_process(
                 dxl_write_data(device,
                         packet->id,
                         packet->parameters[0],
-                        (ui8 *)&packet->parameters[1],
+                        const_cast<ui8 *>(&packet->parameters[1]),
                         packet->parameter_nb-1);
                 break;
 
@@ -44,8 +46,8 @@ void dxl_process(
                     if (dxl_check_id(device, packet->parameters[2+i*length])) {
                         dxl_write_data(device, packet->parameters[2+i*length],
                              addr,
-                             (ui8 *)&packet->parameters[2+i*length+1],
-                             (ui8)(length-1));
+                             const_cast<ui8 *>(&packet->parameters[2+i*length+1]),
+                             static_cast<ui8>(length-1));
                     }
                 }
             }
@@ -56,15 +58,15 @@ void dxl_process(
                 if (packet->id != DXL_BROADCAST) {
                     // adress has two bytes
                     ui8 addr = packet->parameters[0];
-                    addr += (packet->parameters[1]<<8);
+                    addr += (packet->parameters[1]<<MAGIC_NUM_0);
                     //length has two bytes
                     unsigned int length = packet->parameters[2];
-                    length += (packet->parameters[3]<<8);
+                    length += (packet->parameters[3]<<MAGIC_NUM_0);
 
 
                     if (length < sizeof(packet->parameters)) {
                         device->packet.process = true;
-                        dxl_read_data(device, packet->id, addr, (ui8 *)device->packet.parameters, length, (ui8 *)&device->packet.error);
+                        dxl_read_data(device, packet->id, addr, const_cast<ui8 *>(device->packet.parameters), length, const_cast<ui8 *>(&device->packet.error));
 
                         device->packet.parameter_nb = length;
                  }
