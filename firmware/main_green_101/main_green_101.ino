@@ -1,3 +1,4 @@
+#include "bit_foot_config.hpp"
 #include <HardwareSerial.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -12,10 +13,10 @@
 
 
 // start the class
-ADS126X adc; 
+ADS126X adc;
 
 // Arduino pin connected to CS on ADS126X
-int chip_select = PA4; 
+int chip_select = PA4;
 
 // positiv and negative reading pins for the 4 sensor
 uint8_t pos_pin[4];
@@ -27,8 +28,12 @@ int32_t force[4];
 // pin that is connected to the direction pin of the RS485 chip
 int direction_pin = PB1;
 
-// ID of this board 
-ui8 DXL_ID = 101 ;
+// ID of this board
+#if LEFT_OR_RIGHT_FOOT == 'r'
+ui8 DXL_ID = DXL_ID_RIGHT_FOOT;
+#elif LEFT_OR_RIGHT_FOOT == 'l'
+ui8 DXL_ID = DXL_ID_LEFT_FOOT;
+#endif
 
 // buffer for dynamxiel bus
 const int BUFFER_SIZE = 64;
@@ -49,17 +54,20 @@ long time_sum = 0;
 long last_time = 0;
 
 
-void setup() {  
-  pinMode(LED_BUILTIN, OUTPUT);    
+void setup() {
+  pinMode(LED_BUILTIN, OUTPUT);
   // adc reset pin
   pinMode(PA1, OUTPUT);
-  digitalWrite(PA1, HIGH); 
+  digitalWrite(PA1, HIGH);
   // adc start
   pinMode(PA3, OUTPUT);
-  digitalWrite(PA3, HIGH); 
-  
-  //Serial.begin(2000000);
-  Serial3.begin(2000000);  
+  digitalWrite(PA3, HIGH);
+
+#if SERIAL_PORT == 3
+  Serial3.begin(2000000);
+#elif SERIAL_PORT == 1
+  Serial1.begin(2000000);
+#endif
 
   pinMode(direction_pin, OUTPUT);
   digitalWrite(direction_pin, LOW);
@@ -81,12 +89,12 @@ void setup() {
   read_resp.instruction = 0x55;
   read_resp.parameter_nb = 16;
 
-  
-  pos_pin[0]= 7;//ADS126X_AIN7; 
-  pos_pin[1]= 5;//ADS126X_AIN5; 
-  pos_pin[2]= 3;//ADS126X_AIN3; 
+
+  pos_pin[0]= 7;//ADS126X_AIN7;
+  pos_pin[1]= 5;//ADS126X_AIN5;
+  pos_pin[2]= 3;//ADS126X_AIN3;
   pos_pin[3]= 1;//ADS126X_AIN1;
-  
+
   neg_pin[0]= 6;//ADS126X_AIN6;
   neg_pin[1]= 4;//ADS126X_AIN4;
   neg_pin[2]= 2;//ADS126X_AIN2;
@@ -99,18 +107,23 @@ void setup() {
   adc.setFilter(ADS126X_SINC4);
   adc.enableInternalReference();
   adc.startADC1(); // start conversion on ADC1
-  
+
   adc.disableStatus();
   adc.disableCheck();
   adc.setDelay(ADS126X_DELAY_0);
-  adc.clearResetBit();  
-  
+  adc.clearResetBit();
+
 }
 
 void bus_tick(){
   // read as many bytes as there are currently in the serial buffer
+#if SERIAL_PORT == 3
   while(Serial3.available() > 0){
     ui8 inByte = Serial3.read();
+#elif SERIAL_PORT == 1
+  while(Serial1.available() > 0){
+    ui8 inByte = Serial1.read();
+#endif
     dxl_packet_push_byte(&packet, inByte);
     if(packet.process){
       // we recieved a complete package, check if it is for us
@@ -125,18 +138,20 @@ void bus_tick(){
       packet.process = false;
       return;
     }
-  }  
+  }
 }
 
 
 void response_to_ping(){
   digitalWrite(direction_pin, HIGH);
   int len = dxl_write_packet(&ping_resp, write_buffer);
+#if SERIAL_PORT == 3
   Serial3.write(write_buffer, len);
-  // make sure to write the complete buffer before changing direction pin  
+#elif SERIAL_PORT == 1
+  Serial1.write(write_buffer, len);
+#endif
+  // make sure to write the complete buffer before changing direction pin
   delayMicroseconds(40);
-  //Serial1.flush();
-  //Serial1.flush();
   digitalWrite(direction_pin, LOW);
 }
 
@@ -150,7 +165,11 @@ void response_to_read(){
     read_resp.parameters[i*4 + 3] = (force[i] >> 24) & 0xFF;
   }
   int len = dxl_write_packet(&read_resp, write_buffer);
+#if SERIAL_PORT == 3
   Serial3.write(write_buffer, len);
+#elif SERIAL_PORT == 1
+  Serial1.write(write_buffer, len);
+#endif
   // make sure to write the complete buffer before changing direction pin
   delayMicroseconds(140);
   //Serial1.flush();
@@ -175,13 +194,13 @@ void loop(){
 }
 
 
-//void loop() {  
-  
+//void loop() {
+
 //  bus_tick();
 
 //  ADS_tick();
 
-  
+
   /*long current_time = micros();
   time_sum += current_time - last_time;
   last_time = current_time;
@@ -191,5 +210,5 @@ void loop(){
       meassures = 0;
   }
   meassures++;*/
-  
+
 //}
