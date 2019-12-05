@@ -1,6 +1,7 @@
 /*
  * This code is originally based on the work of Team Rhoban available at https://github.com/Rhoban/DXLBoard
  */
+#include "bit_foot_config.hpp"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -195,9 +196,13 @@ void dxl_packet_push_byte(volatile struct dxl_packet *packet, ui8 b)
                 goto pc_error;
             }
             packet->id = b;
-            if(b !=101)
+#if LEFT_OR_RIGHT_FOOT == 'r'
+            if ( b != DXL_ID_RIGHT_FOOT )
+#elif LEFT_OR_RIGHT_FOOT == 'l'
+	    if ( b != DXL_ID_LEFT_FOOT )
+#endif
               goto pc_error;
-            
+
             break;
         case 5:
             packet->parameter_nb = b;
