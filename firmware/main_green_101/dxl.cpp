@@ -69,7 +69,7 @@ void dxl_packet_init(volatile struct dxl_packet *packet) {
 /**
  * Writes the given packet to the buffer
  */
-int dxl_write_packet(volatile struct dxl_packet *packet, ui8 *buffer)
+unsigned int dxl_write_packet(volatile struct dxl_packet *packet, ui8 *buffer)
 {
     unsigned int i;
     unsigned int pos = 0;
@@ -119,7 +119,7 @@ int dxl_write_packet(volatile struct dxl_packet *packet, ui8 *buffer)
 
     uint16_t crc16 = update_crc(0, buffer, pos);
     buffer[pos++] = crc16&MAGIC_NUM_0;
-    buffer[pos++] = (crc16>>MAGIC_NUM_3)&MAGIC_NUM_0;
+    buffer[pos++] = (static_cast<unsigned int>(crc16)>>MAGIC_NUM_3)&MAGIC_NUM_0;
 
     return pos;
 }
@@ -131,13 +131,13 @@ void dxl_copy_packet(volatile struct dxl_packet *from, volatile struct dxl_packe
 /*
  * Compute checksum
  */
-uint16_t update_crc(uint16_t crc_accum, unsigned char *data_blk_ptr, uint16_t data_blk_size)
+uint16_t update_crc(uint16_t crc_accum, const unsigned char *data_blk_ptr, uint16_t data_blk_size)
 {
     uint16_t i, j;
 
     for(j = 0; j < data_blk_size; j++)
     {
-        i = (static_cast<uint16_t>(crc_accum >> MAGIC_NUM_3) ^ data_blk_ptr[j]) & MAGIC_NUM_0;
+        i = static_cast<uint16_t>(static_cast<uint16_t>(crc_accum >> MAGIC_NUM_3) ^ data_blk_ptr[j]) & MAGIC_NUM_0;
         crc_accum = (crc_accum << MAGIC_NUM_3) ^ crc_table[i];
     }
 
@@ -237,7 +237,7 @@ void dxl_packet_push_byte(volatile struct dxl_packet *packet, ui8 b)
             packet->crc16 -= b&MAGIC_NUM_0;
             break;
         case MAGIC_NUM_9:
-            packet->crc16 -= (b<<MAGIC_NUM_3)&MAGIC_NUM_A;
+            packet->crc16 -= (static_cast<unsigned int>(b)<<MAGIC_NUM_3)&MAGIC_NUM_A;
             goto pc_ended;
             break;
         default:

@@ -29,14 +29,14 @@ struct dxl_packet {
     ui8 parameters[DXL_MAX_PARAMS];
     bool process; //is the package finished
     int dxl_state;
-    int crc16;
+    unsigned int crc16;
 };
 
 void dxl_packet_init(volatile struct dxl_packet *packet);
 void dxl_packet_push_byte(volatile struct dxl_packet *packet, ui8 b);
-int dxl_write_packet(volatile struct dxl_packet *packet, ui8 *buffer);
+unsigned int dxl_write_packet(volatile struct dxl_packet *packet, ui8 *buffer);
 void dxl_copy_packet(volatile struct dxl_packet *from, volatile struct dxl_packet *to);
-uint16_t update_crc(uint16_t crc_accum, unsigned char *data_blk_ptr, uint16_t data_blk_size);
+uint16_t update_crc(uint16_t crc_accum, const unsigned char *data_blk_ptr, uint16_t data_blk_size);
 
 /**
  * A Dynamixel Device which is on the bus
