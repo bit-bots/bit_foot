@@ -6,7 +6,7 @@
 
 #include "dxl.hpp"
 
-#define DXL_DEFAULT_BAUDRATE 2000000
+constexpr unsigned int DXL_DEFAULT_BAUDRATE = 2000000;
 
 void dxl_serial_init(volatile struct dxl_device *device, int index);
 void usart_tcie(usart_reg_map *regs, int en);
