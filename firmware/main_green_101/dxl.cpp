@@ -2,18 +2,30 @@
  * This code is originally based on the work of Team Rhoban available at https://github.com/Rhoban/DXLBoard
  */
 #include "bit_foot_config.hpp"
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <libmaple/gpio.h>
-#include <wirish.h>
 #include "dxl.hpp"
 #include "dxl_protocol.hpp"
+#include <array>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <libmaple/gpio.h>
+#include <wirish.h>
 
+constexpr unsigned int MAGIC_NUM_0 = 0xff;
+constexpr unsigned int MAGIC_NUM_1 = 0xfd;
+constexpr unsigned int MAGIC_NUM_2 = 0x55;
+constexpr unsigned int MAGIC_NUM_3 = 8;
+constexpr unsigned int MAGIC_NUM_4 = 5;
+constexpr unsigned int MAGIC_NUM_5 = 6;
+constexpr unsigned int MAGIC_NUM_6 = 7;
+constexpr unsigned int MAGIC_NUM_7 = 0xffff;
+constexpr unsigned int MAGIC_NUM_8 = 0x10000;
+constexpr unsigned int MAGIC_NUM_9 = 0x10001;
+constexpr unsigned int MAGIC_NUM_A = 0xff00;
 
 volatile int dxl_debug = 0;
 
-const unsigned short crc_table[256] = {
+const std::array<uint16_t, 256> crc_table = {
         0x0000, 0x8005, 0x800F, 0x000A, 0x801B, 0x001E, 0x0014, 0x8011,
         0x8033, 0x0036, 0x003C, 0x8039, 0x0028, 0x802D, 0x8027, 0x0022,
         0x8063, 0x0066, 0x006C, 0x8069, 0x0078, 0x807D, 0x8077, 0x0072,
@@ -65,9 +77,9 @@ int dxl_write_packet(volatile struct dxl_packet *packet, ui8 *buffer)
     unsigned int err_bytes =0;
 
     //header
-    buffer[pos++] = 0xff;
-    buffer[pos++] = 0xff;
-    buffer[pos++] = 0xfd;
+    buffer[pos++] = MAGIC_NUM_0; // TODO(tata): buffer[0] will be uninit?
+    buffer[pos++] = MAGIC_NUM_0;
+    buffer[pos++] = MAGIC_NUM_1;
     buffer[pos++] = 0x00;
 
     buffer[pos++] = packet->id;
@@ -75,7 +87,7 @@ int dxl_write_packet(volatile struct dxl_packet *packet, ui8 *buffer)
     pos += 2;
     buffer[pos++] = packet->instruction;
     // we have to send the error for status packages before the parameters
-    if(packet->instruction == 0x55){
+    if(packet->instruction == MAGIC_NUM_2){
         buffer[pos++] = packet->error;
         //remember that the length is one byte longer
         err_bytes =1;
@@ -86,14 +98,14 @@ int dxl_write_packet(volatile struct dxl_packet *packet, ui8 *buffer)
     int ff = 0;
     int stuffing = 0;
     for (i=0; i<packet->parameter_nb; i++) {
-        if (packet->parameters[i] == 0xfd && ff>=2) {
+        if (packet->parameters[i] == MAGIC_NUM_1 && ff>=2) {
             ff = 0;
             // 0xff 0xff 0xfd becomes 0xff 0xff 0xfd 0xfd
-            buffer[pos++] = 0xfd;
-            buffer[pos++] = 0xfd;
+            buffer[pos++] = MAGIC_NUM_1;
+            buffer[pos++] = MAGIC_NUM_1;
             stuffing++;
         } else {
-            if (packet->parameters[i] == 0xff) {
+            if (packet->parameters[i] == MAGIC_NUM_0) {
                 ff++;
             } else {
                 ff = 0;
@@ -102,12 +114,12 @@ int dxl_write_packet(volatile struct dxl_packet *packet, ui8 *buffer)
         }
     }
 
-    buffer[length] = (packet->parameter_nb+3+stuffing+err_bytes)&0xff;
-    buffer[length+1] = ((packet->parameter_nb+3+stuffing+err_bytes)>>8)&0xff;
+    buffer[length] = (packet->parameter_nb+3+stuffing+err_bytes)&MAGIC_NUM_0;
+    buffer[length+1] = ((packet->parameter_nb+3+stuffing+err_bytes)>>MAGIC_NUM_3)&MAGIC_NUM_0;
 
-    unsigned short crc16 = update_crc(0, buffer, pos);
-    buffer[pos++] = crc16&0xff;
-    buffer[pos++] = (crc16>>8)&0xff;
+    uint16_t crc16 = update_crc(0, buffer, pos);
+    buffer[pos++] = crc16&MAGIC_NUM_0;
+    buffer[pos++] = (crc16>>MAGIC_NUM_3)&MAGIC_NUM_0;
 
     return pos;
 }
@@ -119,14 +131,14 @@ void dxl_copy_packet(volatile struct dxl_packet *from, volatile struct dxl_packe
 /*
  * Compute checksum
  */
-unsigned short update_crc(unsigned short crc_accum, unsigned char *data_blk_ptr, unsigned short data_blk_size)
+uint16_t update_crc(uint16_t crc_accum, unsigned char *data_blk_ptr, uint16_t data_blk_size)
 {
-    unsigned short i, j;
+    uint16_t i, j;
 
     for(j = 0; j < data_blk_size; j++)
     {
-        i = ((unsigned short)(crc_accum >> 8) ^ data_blk_ptr[j]) & 0xFF;
-        crc_accum = (crc_accum << 8) ^ crc_table[i];
+        i = (static_cast<uint16_t>(crc_accum >> MAGIC_NUM_3) ^ data_blk_ptr[j]) & MAGIC_NUM_0;
+        crc_accum = (crc_accum << MAGIC_NUM_3) ^ crc_table[i];
     }
 
     return crc_accum;
@@ -135,7 +147,7 @@ unsigned short update_crc(unsigned short crc_accum, unsigned char *data_blk_ptr,
 /*
  * Handle unstuffing for protocol 2
  */
-static int dxl_unstuff(volatile unsigned char *packet, int n)
+auto dxl_unstuff(volatile unsigned char *packet, int n)
 {
     int pos = 0;
     int ff = 0;
@@ -143,17 +155,17 @@ static int dxl_unstuff(volatile unsigned char *packet, int n)
     int k = 0;
     for (int i=0; i<n; i++) {
         bool copy = true;
-        if (ff_fd) {
+        if (ff_fd != 0) {
             ff_fd = 0;
-            if (packet[i] == 0xfd) {
+            if (packet[i] == MAGIC_NUM_1) {
                 k++;
                 copy = false;
             }
         }
-        if (ff >= 2 && packet[i] == 0xfd) {
+        if (ff >= 2 && packet[i] == MAGIC_NUM_1) {
             ff_fd++;
         }
-        if (packet[i] == 0xff) {
+        if (packet[i] == MAGIC_NUM_0) {
             ff++;
         } else {
             ff = 0;
@@ -176,12 +188,12 @@ void dxl_packet_push_byte(volatile struct dxl_packet *packet, ui8 b)
     switch (packet->dxl_state) {
         case 0:
         case 1:
-            if (b != 0xff) {
+            if (b != MAGIC_NUM_0) {
                 goto pc_error;
             }
             break;
         case 2:
-            if (b != 0xfd) {
+            if (b != MAGIC_NUM_1) {
                 goto pc_error;
             }
             break;
@@ -191,73 +203,73 @@ void dxl_packet_push_byte(volatile struct dxl_packet *packet, ui8 b)
             }
             break;
         case 4:
-            if (b== 0xff or b==0xfd){
+            if (b== MAGIC_NUM_0 or b==MAGIC_NUM_1){
                 //we are not reading a header but some data bytes which were stuffed
                 goto pc_error;
             }
             packet->id = b;
 #if LEFT_OR_RIGHT_FOOT == 'r'
-            if ( b != DXL_ID_RIGHT_FOOT )
+            if ( b != DXL_ID_RIGHT_FOOT ) {
 #elif LEFT_OR_RIGHT_FOOT == 'l'
-	    if ( b != DXL_ID_LEFT_FOOT )
+	    if ( b != DXL_ID_LEFT_FOOT ) {
 #endif
               goto pc_error;
-
+	    }
             break;
-        case 5:
+        case MAGIC_NUM_4:
             packet->parameter_nb = b;
             if (b < 0 || b >= DXL_MAX_PARAMS) {
                 goto pc_error;
             }
             break;
-        case 6:
-            packet->parameter_nb += (b<<8);
+        case MAGIC_NUM_5:
+            packet->parameter_nb += (b<<MAGIC_NUM_3);
             packet->parameter_nb -= 3;
             break;
-        case 7:
+        case MAGIC_NUM_6:
             packet->instruction = b;
             if(b==0x01){
                 //this is a ping which does not have any parameters. Next must be the crc
-                packet->dxl_state = 0xffff;
+                packet->dxl_state = MAGIC_NUM_7;
             }
             break;
-        case 0x10000:
-            packet->crc16 -= b&0xff;
+        case MAGIC_NUM_8:
+            packet->crc16 -= b&MAGIC_NUM_0;
             break;
-        case 0x10001:
-            packet->crc16 -= (b<<8)&0xff00;
+        case MAGIC_NUM_9:
+            packet->crc16 -= (b<<MAGIC_NUM_3)&MAGIC_NUM_A;
             goto pc_ended;
             break;
         default:
             //handle parameters
             unsigned int err_byte =0;
-            if(packet->instruction == 0x55){
+            if(packet->instruction == MAGIC_NUM_2){
                 //this is a status package, we have to handle the error byte
                 err_byte =1;
             }
 
             //this is the error byte, handle it
-            if(err_byte && packet->dxl_state == 8){
+            if(err_byte != 0U && packet->dxl_state == MAGIC_NUM_3){
                 packet->error = b;
                 //number of parameters has to be reduced by one, since one byte after length is the error byte
                 packet->parameter_nb -= 1;
             }else {
                 //normal parameter bytes
-                packet->parameters[packet->dxl_state - 8 - err_byte] = b;
+                packet->parameters[packet->dxl_state - MAGIC_NUM_3 - err_byte] = b;
             }
 
-            if (packet->dxl_state - 8 > DXL_MAX_PARAMS) {
+            if (packet->dxl_state - MAGIC_NUM_3 > DXL_MAX_PARAMS) {
                 goto pc_error;
             }
 
-            if (packet->dxl_state-7-err_byte >= packet->parameter_nb) {
-                packet->dxl_state = 0xffff;
+            if (packet->dxl_state-MAGIC_NUM_5-err_byte >= packet->parameter_nb) {
+                packet->dxl_state = MAGIC_NUM_7;
             }
 
             break;
     }
 
-    if (packet->dxl_state < 0x10000) {
+    if (packet->dxl_state < MAGIC_NUM_8) {
         packet->crc16 = update_crc(packet->crc16, &b, 1);
     }
 
@@ -280,10 +292,10 @@ void dxl_packet_push_byte(volatile struct dxl_packet *packet, ui8 b)
 
 void dxl_device_init(volatile struct dxl_device *device)
 {
-    device->next = NULL;
-    device->data = NULL;
-    device->tick = NULL;
-    device->process = NULL;
+    device->next = nullptr;
+    device->data = nullptr;
+    device->tick = nullptr;
+    device->process = nullptr;
     dxl_packet_init(&device->packet);
 }
 
@@ -300,9 +312,9 @@ void dxl_add_slave(struct dxl_bus *bus, volatile struct dxl_device *slave)
 
 void dxl_bus_init(struct dxl_bus *bus)
 {
-    if (bus != NULL) {
-        bus->master = NULL;
-        bus->slaves = NULL;
+    if (bus != nullptr) {
+        bus->master = nullptr;
+        bus->slaves = nullptr;
     }
 }
 
@@ -319,15 +331,15 @@ void dxl_bus_tick(struct dxl_bus *bus)
     // If there is a packet to process from the master
     volatile struct dxl_packet *master_packet = &bus->master->packet;
     if (master_packet->process) {
-        for (slave = bus->slaves; slave != NULL; slave = slave->next) {
+        for (slave = bus->slaves; slave != nullptr; slave = slave->next) {
             slave->process(slave, master_packet);
         }
         master_packet->process = false;
     }
 
     // Look if the slaves have packets for master
-    for (slave = bus->slaves; slave != NULL; slave = slave->next) {
-        if (slave->tick != NULL) {
+    for (slave = bus->slaves; slave != nullptr; slave = slave->next) {
+        if (slave->tick != nullptr) {
             slave->tick(slave);
         }
 
