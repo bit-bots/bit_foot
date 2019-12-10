@@ -2,6 +2,7 @@
  * This code is originally based on the work of Team Rhoban available at https://github.com/Rhoban/DXLBoard
  */
 #include <array>
+#include <memory>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -60,13 +61,13 @@ void usart_tcie(usart_reg_map *regs, int en) {
 }
 
 // Ports that are online
-std::array<struct serial*, MAGIC_NUM_2> serials = {nullptr};
+std::array<std::shared_ptr<struct serial>, MAGIC_NUM_2> serials = {};
 
-static void receiveMode(struct serial *serial);
+static void receiveMode(std::shared_ptr<struct serial> serial);
 
 std::array<ui8, DXL_BUFFER_SIZE> status_send_buffer;
 
-static void serial_received(struct serial *serial)
+static void serial_received(std::shared_ptr<struct serial> serial)
 {
     dma_disable(DMA1, serial->channel);
     usart_tcie(serial->port->c_dev()->regs, 0);
@@ -75,14 +76,14 @@ static void serial_received(struct serial *serial)
     receiveMode(serial);
 }
 
-static void tc_event(struct serial *serial)
+static void tc_event(std::shared_ptr<struct serial> serial)
 {
     if (serial->dmaEvent) {
         serial_received(serial);
     }
 }
 
-static void dma_event(struct serial *serial)
+static void dma_event(std::shared_ptr<struct serial> serial)
 {
     // DMA completed
     serial->dmaEvent = true;
@@ -112,7 +113,7 @@ static void usart3_tc()
     tc_event(serials[3]);
 }
 
-static void setupSerialDMA(struct serial *serial, int n)
+static void setupSerialDMA(std::shared_ptr<struct serial> serial, int n)
 {
     // We're receiving from the USART data register. serial->c_dev()
     // returns a pointer to the libmaple usart_dev for that serial
@@ -143,7 +144,7 @@ static void setupSerialDMA(struct serial *serial, int n)
     if (serial->index == 3) serial->tube_config.tube_req_src = DMA_REQ_SRC_USART3_TX;
 }
 
-static void receiveMode(struct serial *serial)
+static void receiveMode(std::shared_ptr<struct serial> serial)
 {
     asm volatile("nop");
     // Disabling transmitter
@@ -157,7 +158,7 @@ static void receiveMode(struct serial *serial)
     asm volatile("nop");
 }
 
-void transmitMode(struct serial *serial)
+void transmitMode(std::shared_ptr<struct serial> serial)
 {
     asm volatile("nop");
     // Disabling transmitter
@@ -171,7 +172,7 @@ void transmitMode(struct serial *serial)
     asm volatile("nop");
 }
 
-void initSerial(struct serial *serial, unsigned int baudrate)
+void initSerial(std::shared_ptr<struct serial> serial, unsigned int baudrate)
 {
     pinMode(serial->direction, OUTPUT);
 
@@ -186,7 +187,7 @@ void initSerial(struct serial *serial, unsigned int baudrate)
     serials[serial->index] = serial;
 }
 
-void sendSerialPacket(struct serial *serial, volatile struct dxl_packet *packet)
+void sendSerialPacket(std::shared_ptr<struct serial> serial, volatile struct dxl_packet *packet)
 {
     // We have a packet for the serial bus
     // First, clear the serial input buffers
@@ -229,7 +230,7 @@ void sendSerialPacket(struct serial *serial, volatile struct dxl_packet *packet)
  */
 static void dxl_serial_tick(volatile struct dxl_device *self)
 {
-    auto *serial = (struct serial*)self->data;
+    std::shared_ptr<struct serial> serial((struct serial*)self->data);
 
     // Timeout on sending packet, this should never happen
     if (!serial->txComplete && ((millis() - serial->packetSent) > 3)) {
@@ -258,7 +259,7 @@ static void dxl_serial_tick(volatile struct dxl_device *self)
  */
 static void process(volatile struct dxl_device *self, volatile struct dxl_packet *packet)
 {
-    auto *serial = (struct serial*)self->data;
+    std::shared_ptr<struct serial> serial((struct serial*)self->data);
     dxl_serial_tick(self);
 
     // first check if this package is for the servos
@@ -282,9 +283,10 @@ void dxl_serial_init(volatile struct dxl_device *device, int index)
     ASSERT(index >= 1 && index <= 3);
 
     // Initializing device
-    auto *serial = static_cast<struct serial*>(malloc(sizeof(struct serial)));
+    //auto *serial = static_cast<struct serial*>(malloc(sizeof(struct serial)));
+    std::shared_ptr<serial> serial(new struct serial);
     dxl_device_init(device);
-    device->data = static_cast<void *>(serial);
+    device->data = &serial;
     device->tick = dxl_serial_tick;
     device->process = process;
 
