@@ -1,16 +1,22 @@
 #include "bit_foot_config.hpp"
-#include <HardwareSerial.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <math.h>
-#include <libmaple/usart.h>
-#include <libmaple/gpio.h>
-#include <wirish.h>
-#include "malloc.h"
 #include "dxl.hpp"
+#include "malloc.h"
+#include <HardwareSerial.h>
+#include <array>
+#include <cmath>
+#include <cstdio>
+#include <cstdlib>
+#include <libmaple/gpio.h>
+#include <libmaple/usart.h>
+#include <wirish.h>
 
 #include "ADS126X.h"
 
+constexpr unsigned int MAGIC_NUM_0 = 0x55;
+constexpr unsigned int MAGIC_NUM_1 = 0x8D;
+constexpr unsigned int MAGIC_NUM_2 = 0x13;
+constexpr unsigned int MAGIC_NUM_3 = 0x01;
+constexpr unsigned int MAGIC_NUM_4 = 16;
 
 // start the class
 ADS126X adc;
@@ -19,11 +25,11 @@ ADS126X adc;
 int chip_select = PA4;
 
 // positiv and negative reading pins for the 4 sensor
-uint8_t pos_pin[4];
-uint8_t neg_pin[4];
+std::array<uint8_t, 4> pos_pin;
+std::array<uint8_t, 4> neg_pin;
 
 // current force values
-int32_t force[4];
+std::array<int32_t, 4> force;
 
 // pin that is connected to the direction pin of the RS485 chip
 int direction_pin = PB1;
@@ -47,11 +53,11 @@ volatile struct dxl_packet read_resp;
 // the sensor that is currently read
 int current_sensor = 0;
 
-unsigned long startTime = millis();
+//uint64_t startTime = millis();
 
-long meassures = 0;
-long time_sum = 0;
-long last_time = 0;
+//uint64_t meassures = 0;
+//uint64_t time_sum = 0;
+//uint64_t last_time = 0;
 
 
 void setup() {
@@ -78,16 +84,16 @@ void setup() {
   dxl_packet_init(&read_resp);
 
   ping_resp.id = DXL_ID;
-  ping_resp.instruction = 0x55;
+  ping_resp.instruction = MAGIC_NUM_0;
   // set to model number 5005 and firmware 1
-  ping_resp.parameters[0] = 0x8D;
-  ping_resp.parameters[1] = 0x13;
-  ping_resp.parameters[2] = 0x01;
+  ping_resp.parameters[0] = MAGIC_NUM_1;
+  ping_resp.parameters[1] = MAGIC_NUM_2;
+  ping_resp.parameters[2] = MAGIC_NUM_3;
   ping_resp.parameter_nb = 3;
 
   read_resp.id = DXL_ID;
-  read_resp.instruction = 0x55;
-  read_resp.parameter_nb = 16;
+  read_resp.instruction = MAGIC_NUM_0;
+  read_resp.parameter_nb = MAGIC_NUM_4;
 
 
   pos_pin[0]= 7;//ADS126X_AIN7;
@@ -144,7 +150,7 @@ void bus_tick(){
 
 void response_to_ping(){
   digitalWrite(direction_pin, HIGH);
-  int len = dxl_write_packet(&ping_resp, write_buffer);
+  unsigned int len = dxl_write_packet(&ping_resp, write_buffer);
 #if SERIAL_PORT == 3
   Serial3.write(write_buffer, len);
 #elif SERIAL_PORT == 1
@@ -164,7 +170,7 @@ void response_to_read(){
     read_resp.parameters[i*4 + 2] = (force[i] >> 16) & 0xFF;
     read_resp.parameters[i*4 + 3] = (force[i] >> 24) & 0xFF;
   }
-  int len = dxl_write_packet(&read_resp, write_buffer);
+  unsigned int len = dxl_write_packet(&read_resp, write_buffer);
 #if SERIAL_PORT == 3
   Serial3.write(write_buffer, len);
 #elif SERIAL_PORT == 1
@@ -183,7 +189,7 @@ void loop(){
   // dummy read to change pin, see issue
   // https://github.com/Molorius/ADS126X/issues/5
   adc.readADC1(pos_pin[current_sensor], neg_pin[current_sensor]);
-  unsigned long current_time = micros();
+  uint64_t current_time = micros();
   while(micros() - 1000 < current_time)
   {
       bus_tick();
