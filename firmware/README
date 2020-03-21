@@ -1,30 +1,3 @@
-Installing firmware
--------------------
-
-Preparing Blue Pill
-^^^^^^^^^^^^^^^^^^^
-
-1. Make sure that you have the right resistor installed on R10, since some computers will not work with the wrongly installed resistors. If you have a wrong one you can still try it, since it works most of the time. More information: https://www.onetransistor.eu/2017/11/stm32-bluepill-arduino-ide.html
-
-2. Follow this tutorial to install the bootloader on the blue pill https://medium.com/@paramaggarwal/programming-an-stm32f103-board-using-usb-port-blue-pill-953cec0dbc86
-   BUT add the "-e" option when running the python script to erase the memory or it may not work
-
-3. If you want to use Arduino you can see here how you can use it
-https://www.onetransistor.eu/2017/11/stm32-bluepill-arduino-ide.html
-
-4. install also https://github.com/rogerclarkmelbourne/Arduino_STM32 and https://github.com/Molorius/ADS126X
-
-5. make sure you have the correct rights or directly use sudo
-
-
-Writing Firmware on Blue Pill
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-1. Open main sketch in arduino
-
-2. Flash onto Blue Pill (you may have to press the reset button)
-
-
-
-
+Use Dynamixel2Arduino Library available at https://github.com/ROBOTIS-GIT/Dynamixel2Arduino
 Use ADS Library available at https://github.com/Molorius/ADS126X
+
