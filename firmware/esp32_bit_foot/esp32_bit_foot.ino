@@ -5,11 +5,13 @@
 #include "driver/uart.h"
 #include "soc/uart_struct.h"
 #include "esp32-hal-cpu.h"
+#include "WiFi.h"
 // define two tasks for reading the dxl bus and doing other work
 void TaskDXL( void *pvParameters );
 void TaskWorker( void *pvParameters );
 TaskHandle_t th_dxl,th_worker;
 
+#define BUFF_SIZE 1024
 
 /*---------------------- DXL defines and variables ---------------------*/
 
@@ -19,9 +21,9 @@ TaskHandle_t th_dxl,th_worker;
 #define DEFAULT_ID 101
 #define DEFAULT_BAUD 4 //2mbaud since the flashing tool cant handle more
 
-DYNAMIXEL::SerialPortHandler dxl_port(Serial, DXL_DIR_PIN);
+//DYNAMIXEL::SerialPortHandler dxl_port(Serial, DXL_DIR_PIN);
 
-DYNAMIXEL::Slave dxl(dxl_port, DXL_MODEL_NUM);
+DYNAMIXEL::Slave dxl(NULL, DXL_MODEL_NUM);
 
 #define ADDR_CONTROL_ITEM_BAUD 8
 
@@ -47,7 +49,17 @@ std::array<int32_t, 4> force; // read over the dxl bus
 
 
 void setup() {
+      pinMode(16, OUTPUT);
+      pinMode(13, OUTPUT);
+        pinMode(15, OUTPUT);
+            pinMode(33, OUTPUT);
+
+  // make sure we have highest CPU frequency
   setCpuFrequencyMhz(240);
+  // disable Bluetooth and Wifi
+  btStop();
+  WiFi.mode(WIFI_OFF);
+  
   disableCore0WDT(); // required since we dont want FreeRTOS to slow down our reading if the Wachdogtimer (WTD) fires
   disableCore1WDT();
   xTaskCreatePinnedToCore(
@@ -55,9 +67,9 @@ void setup() {
     ,  "TaskDXL"   // A name just for humans
     ,  65536  // This stack size can be checked & adjusted by reading the Stack Highwater
     ,  NULL
-    ,  3  // Priority 3 since otherwise 
+    ,  10  // Priority 3 since otherwise 
     ,  &th_dxl 
-    ,  0);
+    ,  1);
 
   xTaskCreatePinnedToCore(
     TaskWorker
@@ -66,7 +78,7 @@ void setup() {
     ,  NULL
     ,  3  // Priority
     ,  &th_worker 
-    ,  1);
+    ,  0);
 }
 
 void loop()
@@ -117,12 +129,20 @@ void TaskDXL(void *pvParameters)
   id = prefs.getUChar("id");
   baud = prefs.getUChar("baud");
 
-  dxl_port.begin(dxl_to_real_baud(baud));
+  //dxl_port.begin(dxl_to_real_baud(baud));
 
-  
+  uart_config_t uart_config = {
+      .baud_rate = 2000000,
+      .data_bits = UART_DATA_8_BITS,
+      .parity    = UART_PARITY_DISABLE,
+      .stop_bits = UART_STOP_BITS_1,
+      .flow_ctrl = UART_HW_FLOWCTRL_DISABLE
+  };
+
   // set up UART for ESP32 for lower latency
   const int uart_buffer_size = (1024 * 2);
   uart_driver_install(UART_NUM_0, uart_buffer_size, 0, 10, NULL, 0);
+  uart_param_config(UART_NUM_0, &uart_config);
   uart_intr_config_t uart_intr;
   uart_intr.intr_enable_mask = UART_RXFIFO_TOUT_INT_ENA_M;
   // values optimized by experimenting with dynamixel pings
@@ -130,12 +150,12 @@ void TaskDXL(void *pvParameters)
   uart_intr.rx_timeout_thresh = 1; //10 default
   uart_intr.txfifo_empty_intr_thresh = 10; //
   uart_intr_config(UART_NUM_0, &uart_intr);
-  uart_enable_tx_intr(UART_NUM_0, 1, UART_FIFO_LEN);
-  uart_enable_rx_intr(UART_NUM_0);  
-  // not release as version yet, therefore does not compile
-  //uart_set_always_rx_timeout(UART_NUM_0, 1);
+
   uart_set_hw_flow_ctrl(UART_NUM_0, UART_HW_FLOWCTRL_DISABLE, 0);
   uart_set_sw_flow_ctrl(UART_NUM_0, false, 0, 0);
+  
+  uart_disable_tx_intr(UART_NUM_0);  
+
   
   dxl.setPortProtocolVersion(DXL_PROTOCOL_VER_2_0);
   dxl.setFirmwareVersion(1);
@@ -148,10 +168,23 @@ void TaskDXL(void *pvParameters)
   dxl.addControlItem(ADDR_CONTROL_ITEM_SENSOR_2, force[2]);
   dxl.addControlItem(ADDR_CONTROL_ITEM_SENSOR_3, force[3]);
   dxl.setWriteCallbackFunc(write_callback_func);
-  
+
+
+  uint8_t *rx_fifo_data = (uint8_t *) malloc(BUFF_SIZE);
   for (;;)
   {
     dxl.processPacket();
+    // read all there is from the bus until we get one byte time no data
+    /*int len = uart_read_bytes(UART_NUM_0, data, BUF_SIZE, portTICK_RATE_MS);   
+    if(len > 0){
+      // disable rx interrupt for now, since we currently dont want to read
+      uart_disable_rx_intr(UART_NUM_0);  
+      // process complete package
+      
+      // reanable tx intterupt 
+      uart_enable_rx_intr(UART_NUM_0);  
+    }*/
+    
     if(dxl.getID() != id) // since we cant add the id as a control item, we need to check if it has been updated manually
     {
       id = dxl.getID();
