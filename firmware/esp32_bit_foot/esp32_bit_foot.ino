@@ -4,6 +4,7 @@
 #include <Preferences.h>
 #include "driver/uart.h"
 #include "soc/uart_struct.h"
+#include "esp32-hal-cpu.h"
 // define two tasks for reading the dxl bus and doing other work
 void TaskDXL( void *pvParameters );
 void TaskWorker( void *pvParameters );
@@ -16,7 +17,7 @@ TaskHandle_t th_dxl,th_worker;
 #define DXL_PROTOCOL_VER_2_0 2.0
 #define DXL_MODEL_NUM 0xaffe
 #define DEFAULT_ID 101
-#define DEFAULT_BAUD 6 //4mbaud
+#define DEFAULT_BAUD 4 //2mbaud since the flashing tool cant handle more
 
 DYNAMIXEL::SerialPortHandler dxl_port(Serial, DXL_DIR_PIN);
 
@@ -46,9 +47,7 @@ std::array<int32_t, 4> force; // read over the dxl bus
 
 
 void setup() {
-  pinMode(17, OUTPUT);
-  pinMode(16, OUTPUT);
-  pinMode(14, OUTPUT);
+  setCpuFrequencyMhz(240);
   disableCore0WDT(); // required since we dont want FreeRTOS to slow down our reading if the Wachdogtimer (WTD) fires
   disableCore1WDT();
   xTaskCreatePinnedToCore(
@@ -89,7 +88,7 @@ uint32_t dxl_to_real_baud(uint8_t baud)
     case 4: real_baud = 2000000; break;
     case 5: real_baud = 3000000; break;
     case 6: real_baud = 4000000; break;
-    case 7: real_baud = 5000000; break;
+    case 7: real_baud = 4500000; break;
   }
   return real_baud;
 }
@@ -125,14 +124,9 @@ void TaskDXL(void *pvParameters)
   const int uart_buffer_size = (1024 * 2);
   uart_driver_install(UART_NUM_0, uart_buffer_size, 0, 10, NULL, 0);
   uart_intr_config_t uart_intr;
-  uart_intr.intr_enable_mask = UART_RXFIFO_FULL_INT_ENA_M
-                        | UART_RXFIFO_TOUT_INT_ENA_M
-                        | UART_FRM_ERR_INT_ENA_M
-                        | UART_RXFIFO_OVF_INT_ENA_M
-                        | UART_BRK_DET_INT_ENA_M
-                        | UART_PARITY_ERR_INT_ENA_M;
+  uart_intr.intr_enable_mask = UART_RXFIFO_TOUT_INT_ENA_M;
   // values optimized by experimenting with dynamixel pings
-  uart_intr.rxfifo_full_thresh = 10; //120 default
+  uart_intr.rxfifo_full_thresh = 120; //120 default
   uart_intr.rx_timeout_thresh = 1; //10 default
   uart_intr.txfifo_empty_intr_thresh = 10; //
   uart_intr_config(UART_NUM_0, &uart_intr);
@@ -141,6 +135,7 @@ void TaskDXL(void *pvParameters)
   // not release as version yet, therefore does not compile
   //uart_set_always_rx_timeout(UART_NUM_0, 1);
   uart_set_hw_flow_ctrl(UART_NUM_0, UART_HW_FLOWCTRL_DISABLE, 0);
+  uart_set_sw_flow_ctrl(UART_NUM_0, false, 0, 0);
   
   dxl.setPortProtocolVersion(DXL_PROTOCOL_VER_2_0);
   dxl.setFirmwareVersion(1);
@@ -157,13 +152,11 @@ void TaskDXL(void *pvParameters)
   for (;;)
   {
     dxl.processPacket();
-    digitalWrite(14, HIGH);
     if(dxl.getID() != id) // since we cant add the id as a control item, we need to check if it has been updated manually
     {
       id = dxl.getID();
       prefs.putUChar("id", id);
     }
-    digitalWrite(14, LOW);
   }
 }
 
