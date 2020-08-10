@@ -2,6 +2,7 @@
 #include "ADS126X.h"
 #include <Preferences.h>
 #include <Dynamixel2Arduino.h>
+#include "fast_slave.h"
 
 // define two tasks for reading the dxl bus and doing other work
 void TaskDXL( void *pvParameters );
@@ -32,8 +33,7 @@ uint8_t baud;
 uart_t* uart;
 
 
-
-DYNAMIXEL::Slave dxl(NULL, DXL_MODEL_NUM);
+DYNAMIXEL::FastSlave dxl(NULL, DXL_MODEL_NUM);
 
 /*---------------------- ADS defines and variables ---------------------*/
 //ads variables 
@@ -133,7 +133,11 @@ void TaskDXL(void *pvParameters)
 
   // init uart 0, given baud, 8bits 1stop no parity, pin 3 and 1, 256 buffer, no inversion
   uart = uartBegin(0, dxl_to_real_baud(baud), SERIAL_8N1, 3, 1,  256, false);
-
+  // disable all interrupts
+  uart->dev->conf1.rx_tout_en = 0;
+  uart->dev->int_ena.rxfifo_full = 0;
+  uart->dev->int_ena.frm_err = 0;
+  uart->dev->int_ena.rxfifo_tout = 0;
 
   for (;;)
   {
