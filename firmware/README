@@ -1,3 +1,3 @@
-Use Dynamixel2Arduino Library available at https://github.com/ROBOTIS-GIT/Dynamixel2Arduino
 Use ADS Library available at https://github.com/Molorius/ADS126X
-
+Copy or link the modified version of Dynamixel2Arduino in your ~/Arduino/libraries/ folder
+Copy or link the modified version of ESP32 board in your ~/.arduino15/packages/ folder

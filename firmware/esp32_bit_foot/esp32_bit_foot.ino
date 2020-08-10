@@ -1,11 +1,13 @@
-#include <Dynamixel2Arduino.h>
+//#include "esp32-hal-uart.h"
+//#include "soc/uart_struct.h"
 #include <array>
 #include "ADS126X.h"
-#include <Preferences.h>
 #include "driver/uart.h"
-#include "soc/uart_struct.h"
 #include "esp32-hal-cpu.h"
 #include "WiFi.h"
+#include <Preferences.h>
+#include <Dynamixel2Arduino.h>
+
 // define two tasks for reading the dxl bus and doing other work
 void TaskDXL( void *pvParameters );
 void TaskWorker( void *pvParameters );
@@ -21,10 +23,6 @@ TaskHandle_t th_dxl,th_worker;
 #define DEFAULT_ID 101
 #define DEFAULT_BAUD 4 //2mbaud since the flashing tool cant handle more
 
-//DYNAMIXEL::SerialPortHandler dxl_port(Serial, DXL_DIR_PIN);
-
-DYNAMIXEL::Slave dxl(NULL, DXL_MODEL_NUM);
-
 #define ADDR_CONTROL_ITEM_BAUD 8
 
 #define ADDR_CONTROL_ITEM_SENSOR_0 36
@@ -36,7 +34,13 @@ DYNAMIXEL::Slave dxl(NULL, DXL_MODEL_NUM);
 Preferences prefs;
 uint8_t id;
 uint8_t baud;
+#define SERIAL_8N1 0x800001c
 
+uart_t* uart;
+
+
+
+DYNAMIXEL::Slave dxl(NULL, DXL_MODEL_NUM);
 
 /*---------------------- ADS defines and variables ---------------------*/
 //ads variables 
@@ -49,11 +53,6 @@ std::array<int32_t, 4> force; // read over the dxl bus
 
 
 void setup() {
-      pinMode(16, OUTPUT);
-      pinMode(13, OUTPUT);
-        pinMode(15, OUTPUT);
-            pinMode(33, OUTPUT);
-
   // make sure we have highest CPU frequency
   setCpuFrequencyMhz(240);
   // disable Bluetooth and Wifi
@@ -118,6 +117,10 @@ void write_callback_func(uint16_t item_addr, uint8_t &dxl_err_code, void* arg)
 void TaskDXL(void *pvParameters) 
 {
   (void) pvParameters;
+
+  // enable pin
+  pinMode(DXL_DIR_PIN, OUTPUT);
+
   
   prefs.begin("dxl");
   if(!prefs.getUChar("init")) // check if prefs are initialized
@@ -128,34 +131,6 @@ void TaskDXL(void *pvParameters)
   }
   id = prefs.getUChar("id");
   baud = prefs.getUChar("baud");
-
-  //dxl_port.begin(dxl_to_real_baud(baud));
-
-  uart_config_t uart_config = {
-      .baud_rate = 2000000,
-      .data_bits = UART_DATA_8_BITS,
-      .parity    = UART_PARITY_DISABLE,
-      .stop_bits = UART_STOP_BITS_1,
-      .flow_ctrl = UART_HW_FLOWCTRL_DISABLE
-  };
-
-  // set up UART for ESP32 for lower latency
-  const int uart_buffer_size = (1024 * 2);
-  uart_driver_install(UART_NUM_0, uart_buffer_size, 0, 10, NULL, 0);
-  uart_param_config(UART_NUM_0, &uart_config);
-  uart_intr_config_t uart_intr;
-  uart_intr.intr_enable_mask = UART_RXFIFO_TOUT_INT_ENA_M;
-  // values optimized by experimenting with dynamixel pings
-  uart_intr.rxfifo_full_thresh = 120; //120 default
-  uart_intr.rx_timeout_thresh = 1; //10 default
-  uart_intr.txfifo_empty_intr_thresh = 10; //
-  uart_intr_config(UART_NUM_0, &uart_intr);
-
-  uart_set_hw_flow_ctrl(UART_NUM_0, UART_HW_FLOWCTRL_DISABLE, 0);
-  uart_set_sw_flow_ctrl(UART_NUM_0, false, 0, 0);
-  
-  uart_disable_tx_intr(UART_NUM_0);  
-
   
   dxl.setPortProtocolVersion(DXL_PROTOCOL_VER_2_0);
   dxl.setFirmwareVersion(1);
@@ -169,11 +144,14 @@ void TaskDXL(void *pvParameters)
   dxl.addControlItem(ADDR_CONTROL_ITEM_SENSOR_3, force[3]);
   dxl.setWriteCallbackFunc(write_callback_func);
 
+  // init uart 0, given baud, 8bits 1stop no parity, pin 3 and 1, 256 buffer, no inversion
+  uart = uartBegin(0, dxl_to_real_baud(baud), SERIAL_8N1, 3, 1,  256, false);
+
 
   uint8_t *rx_fifo_data = (uint8_t *) malloc(BUFF_SIZE);
   for (;;)
   {
-    if(dxl.processPacket()){
+    if(dxl.processPacket(uart)){
       if(dxl.getID() != id) // since we cant add the id as a control item, we need to check if it has been updated manually
       {
         id = dxl.getID();
