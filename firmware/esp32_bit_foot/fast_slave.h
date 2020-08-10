@@ -21,6 +21,7 @@
 #include "dxl_c/protocol.h"
 #include "config.h"
 #include "esp32-hal-uart.h"
+#include "soc/uart_struct.h"
 
 struct uart_struct_t {
   uart_dev_t * dev;
