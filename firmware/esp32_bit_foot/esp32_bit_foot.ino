@@ -173,22 +173,12 @@ void TaskDXL(void *pvParameters)
   uint8_t *rx_fifo_data = (uint8_t *) malloc(BUFF_SIZE);
   for (;;)
   {
-    dxl.processPacket();
-    // read all there is from the bus until we get one byte time no data
-    /*int len = uart_read_bytes(UART_NUM_0, data, BUF_SIZE, portTICK_RATE_MS);   
-    if(len > 0){
-      // disable rx interrupt for now, since we currently dont want to read
-      uart_disable_rx_intr(UART_NUM_0);  
-      // process complete package
-      
-      // reanable tx intterupt 
-      uart_enable_rx_intr(UART_NUM_0);  
-    }*/
-    
-    if(dxl.getID() != id) // since we cant add the id as a control item, we need to check if it has been updated manually
-    {
-      id = dxl.getID();
-      prefs.putUChar("id", id);
+    if(dxl.processPacket()){
+      if(dxl.getID() != id) // since we cant add the id as a control item, we need to check if it has been updated manually
+      {
+        id = dxl.getID();
+        prefs.putUChar("id", id);
+      }
     }
   }
 }
