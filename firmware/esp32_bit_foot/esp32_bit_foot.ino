@@ -1,10 +1,5 @@
-//#include "esp32-hal-uart.h"
-//#include "soc/uart_struct.h"
 #include <array>
 #include "ADS126X.h"
-#include "driver/uart.h"
-#include "esp32-hal-cpu.h"
-#include "WiFi.h"
 #include <Preferences.h>
 #include <Dynamixel2Arduino.h>
 
@@ -12,8 +7,6 @@
 void TaskDXL( void *pvParameters );
 void TaskWorker( void *pvParameters );
 TaskHandle_t th_dxl,th_worker;
-
-#define BUFF_SIZE 1024
 
 /*---------------------- DXL defines and variables ---------------------*/
 
@@ -53,12 +46,6 @@ std::array<int32_t, 4> force; // read over the dxl bus
 
 
 void setup() {
-  // make sure we have highest CPU frequency
-  setCpuFrequencyMhz(240);
-  // disable Bluetooth and Wifi
-  btStop();
-  WiFi.mode(WIFI_OFF);
-  
   disableCore0WDT(); // required since we dont want FreeRTOS to slow down our reading if the Wachdogtimer (WTD) fires
   disableCore1WDT();
   xTaskCreatePinnedToCore(
@@ -66,9 +53,9 @@ void setup() {
     ,  "TaskDXL"   // A name just for humans
     ,  65536  // This stack size can be checked & adjusted by reading the Stack Highwater
     ,  NULL
-    ,  10  // Priority 3 since otherwise 
+    ,  3  // Priority 3 since otherwise 
     ,  &th_dxl 
-    ,  1);
+    ,  0);
 
   xTaskCreatePinnedToCore(
     TaskWorker
@@ -77,7 +64,7 @@ void setup() {
     ,  NULL
     ,  3  // Priority
     ,  &th_worker 
-    ,  0);
+    ,  1);
 }
 
 void loop()
@@ -148,7 +135,6 @@ void TaskDXL(void *pvParameters)
   uart = uartBegin(0, dxl_to_real_baud(baud), SERIAL_8N1, 3, 1,  256, false);
 
 
-  uint8_t *rx_fifo_data = (uint8_t *) malloc(BUFF_SIZE);
   for (;;)
   {
     if(dxl.processPacket(uart)){
