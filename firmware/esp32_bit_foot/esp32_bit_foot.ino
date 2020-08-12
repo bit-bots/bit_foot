@@ -28,7 +28,7 @@ TaskHandle_t th_dxl,th_worker;
 Preferences prefs;
 uint8_t id;
 uint8_t baud;
-#define SERIAL_8N1 0x800001c
+
 
 uart_t* uart;
 
