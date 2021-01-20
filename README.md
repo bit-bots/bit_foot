@@ -4,7 +4,7 @@ This board measures 4 differential voltage signals from load cells. It connects 
 
 We managed to achieve a sensor update rate of 697Hz. The board itself can be read faster than 1kHz from the Dynamixel bus.
 
-Documentation is located at http://doku.bit-bots.de/meta/manual/hardware/bitfoot.html
+Documentation is located [here](http://doku.bit-bots.de/meta/manual/hardware/electronics/bitfoot.html)
 
 This board is based on the [ForceFoot](https://github.com/Rhoban/ForceFoot) by Rhoban
 
